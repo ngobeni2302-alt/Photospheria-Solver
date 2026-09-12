@@ -1,56 +1,294 @@
 from src.models.planting_action import PlantingAction
+from src.rules.plant_rules import can_plant
 
 
-def get_starting_plants(plants, unlock_conditions):
-    """
-    Find plants that do not have an unlock condition.
+LEVEL_TWO_STARTING_COUNTS = {
+    "Grass": 24,
+    "Rose Bush": 18,
+    "Lavender": 18,
+    "Dwarf Sunflower": 14,
+    "Oak Tree": 8,
+}
 
-    These plants are treated as available at the
-    beginning of Level 1.
-    """
 
-    locked_plant_names = {
+LEVEL_TWO_SECOND_WAVE = {
+    "Blue Moss": 24,
+    "Orange Blossom": 10,
+    "Crimson Vine": 18,
+    "Stone Reed": 4,
+    "Razorgrass": 4,
+}
+
+
+LEVEL_TWO_THIRD_WAVE = {
+    "Silver Fern": 12,
+    "Purple Canopy Tree": 4,
+    "Moonpetal Lily": 8,
+    "Ironthorn Shrub": 8,
+}
+
+
+LEVEL_TWO_AFTER_RAIN = {
+    "Mire Bloom": 8,
+}
+
+
+LEVEL_THREE_STARTING_COUNTS = {
+    "Grass": 70,
+    "Rose Bush": 55,
+    "Lavender": 55,
+    "Dwarf Sunflower": 40,
+    "Oak Tree": 10,
+}
+
+
+LEVEL_THREE_AFTER_DROUGHT = {
+    "Crystal Cactus": 20,
+}
+
+
+LEVEL_THREE_SECOND_WAVE = {
+    "Blue Moss": 70,
+    "Orange Blossom": 30,
+    "Crimson Vine": 70,
+    "Stone Reed": 10,
+    "Razorgrass": 10,
+}
+
+
+LEVEL_THREE_THIRD_WAVE = {
+    "Silver Fern": 80,
+    "Purple Canopy Tree": 8,
+    "Moonpetal Lily": 55,
+    "Ironthorn Shrub": 65,
+}
+
+
+LEVEL_THREE_ADVANCED_WAVE = {
+    "Skyvine": 10,
+    "Amber Fern": 10,
+    "Thornheart Bramble": 10,
+    "Living Topiary": 10,
+    "Bloodbloom": 10,
+    "Sunshard Bloom": 10,
+}
+
+
+LEVEL_THREE_AFTER_RAIN = {
+    "Mire Bloom": 20,
+}
+
+
+def get_starting_plants(
+    plants,
+    unlock_conditions
+):
+    locked_names = {
         rule["plant"]
         for rule in unlock_conditions
     }
 
-    starting_plants = []
-
-    for plant in plants:
-        if plant.name not in locked_plant_names:
-            starting_plants.append(plant)
-
-    # Always keep the order deterministic
-    starting_plants.sort(key=lambda plant: plant.index)
-
-    return starting_plants
+    return sorted(
+        [
+            plant
+            for plant in plants
+            if plant.name not in locked_names
+        ],
+        key=lambda plant: plant.index,
+    )
 
 
-def get_valid_cells(world, plant):
-    """
-    Find cells where a plant may initially be placed.
-
-    A cell must:
-    - be plantable terrain
-    - have soil preferred by the plant
-    """
-
-    valid_cells = []
-
-    for cell in world.get_plantable_cells():
-
-        if cell.soil in plant.preferred_soil:
-            valid_cells.append(cell)
-
-    # Always sort to keep the solver deterministic
-    valid_cells.sort(
+def _candidate_cells(
+    world,
+    plant
+):
+    return sorted(
+        [
+            cell
+            for cell
+            in world.get_plantable_cells()
+            if cell.soil
+            in plant.preferred_soil
+        ],
         key=lambda cell: (
             cell.row,
             cell.col
-        )
+        ),
     )
 
-    return valid_cells
+
+def _spread_choice(
+    candidates,
+    amount
+):
+    if amount <= 0:
+        return []
+
+    if not candidates:
+        return []
+
+    if amount >= len(candidates):
+        return candidates[:]
+
+    chosen = []
+
+    for i in range(amount):
+        index = round(
+            i
+            * (len(candidates) - 1)
+            / max(
+                amount - 1,
+                1
+            )
+        )
+
+        chosen.append(
+            candidates[index]
+        )
+
+    unique = []
+    seen = set()
+
+    for cell in chosen:
+        key = (
+            cell.row,
+            cell.col
+        )
+
+        if key not in seen:
+            seen.add(
+                key
+            )
+
+            unique.append(
+                cell
+            )
+
+    if len(unique) < amount:
+        for cell in candidates:
+            key = (
+                cell.row,
+                cell.col
+            )
+
+            if key not in seen:
+                seen.add(
+                    key
+                )
+
+                unique.append(
+                    cell
+                )
+
+                if len(unique) == amount:
+                    break
+
+    return unique
+
+
+def _add_wave(
+    actions,
+    world,
+    plants_by_name,
+    counts,
+    tick,
+    used_positions
+):
+
+    for plant_name, amount in counts.items():
+
+        plant = plants_by_name.get(
+            plant_name
+        )
+
+        if plant is None:
+            continue
+
+        candidates = [
+            cell
+            for cell
+            in _candidate_cells(
+                world,
+                plant
+            )
+            if (
+                cell.row,
+                cell.col
+            )
+            not in used_positions
+        ]
+
+        selected_cells = _spread_choice(
+            candidates,
+            amount
+        )
+
+        for cell in selected_cells:
+
+            if not can_plant(
+                plant,
+                cell,
+                tick,
+                world,
+                used_positions
+            ):
+                continue
+
+            used_positions.add(
+                (
+                    cell.row,
+                    cell.col
+                )
+            )
+
+            action = PlantingAction(
+                tick=tick,
+                plant_index=plant.index,
+                x=cell.col,
+                y=cell.row,
+            )
+
+            actions.append(
+                action
+            )
+
+
+def _event_tick(
+    world,
+    event_name
+):
+    ticks = [
+        command["tick"]
+        for command
+        in world.commands
+        if (
+            command.get("type")
+            == "event"
+            and command.get("event")
+            == event_name
+        )
+    ]
+
+    if not ticks:
+        return None
+
+    return min(
+        ticks
+    )
+
+
+def _sort_actions(
+    actions
+):
+    return sorted(
+        actions,
+        key=lambda action: (
+            action.tick,
+            action.plant_index,
+            action.x,
+            action.y,
+        ),
+    )
 
 
 def build_level_one_strategy(
@@ -58,85 +296,245 @@ def build_level_one_strategy(
     plants,
     unlock_conditions
 ):
-    """
-    Creates our first deterministic Level 1 planting strategy.
 
-    For the baseline:
-    - use plants available from the start
-    - plant one of each species
-    - spread their starting positions around the greenhouse
-    - plant them at tick 0
-
-    Later this strategy will be improved using simulation
-    and optimisation.
-    """
+    actions = []
+    used_positions = set()
 
     starting_plants = get_starting_plants(
         plants,
         unlock_conditions
     )
 
+    for plant in starting_plants:
+
+        candidates = [
+            cell
+            for cell
+            in _candidate_cells(
+                world,
+                plant
+            )
+            if (
+                cell.row,
+                cell.col
+            )
+            not in used_positions
+        ]
+
+        if not candidates:
+            continue
+
+        cell = candidates[
+            len(candidates) // 2
+        ]
+
+        used_positions.add(
+            (
+                cell.row,
+                cell.col
+            )
+        )
+
+        actions.append(
+            PlantingAction(
+                tick=0,
+                plant_index=plant.index,
+                x=cell.col,
+                y=cell.row,
+            )
+        )
+
+    return _sort_actions(
+        actions
+    )
+
+
+def build_level_two_strategy(
+    world,
+    plants,
+    unlock_conditions
+):
+
+    actions = []
+    used_positions = set()
+
+    plants_by_name = {
+        plant.name: plant
+        for plant in plants
+    }
+
+    _add_wave(
+        actions,
+        world,
+        plants_by_name,
+        LEVEL_TWO_STARTING_COUNTS,
+        tick=0,
+        used_positions=used_positions,
+    )
+
+    _add_wave(
+        actions,
+        world,
+        plants_by_name,
+        LEVEL_TWO_SECOND_WAVE,
+        tick=25,
+        used_positions=used_positions,
+    )
+
+    _add_wave(
+        actions,
+        world,
+        plants_by_name,
+        LEVEL_TWO_THIRD_WAVE,
+        tick=80,
+        used_positions=used_positions,
+    )
+
+    rain_tick = _event_tick(
+        world,
+        "Rain"
+    )
+
+    if rain_tick is not None:
+
+        _add_wave(
+            actions,
+            world,
+            plants_by_name,
+            LEVEL_TWO_AFTER_RAIN,
+            tick=rain_tick + 1,
+            used_positions=used_positions,
+        )
+
+    return _sort_actions(
+        actions
+    )
+
+
+def build_level_three_strategy(
+    world,
+    plants,
+    unlock_conditions
+):
+
     actions = []
 
     used_positions = set()
 
-    number_of_plants = len(starting_plants)
+    plants_by_name = {
+        plant.name: plant
+        for plant in plants
+    }
 
-    for plant_number, plant in enumerate(starting_plants):
+    # Starting species
+    _add_wave(
+        actions,
+        world,
+        plants_by_name,
+        LEVEL_THREE_STARTING_COUNTS,
+        tick=0,
+        used_positions=used_positions,
+    )
 
-        valid_cells = get_valid_cells(
+    # Drought occurs at tick 10.
+    drought_tick = _event_tick(
+        world,
+        "Drought"
+    )
+
+    if drought_tick is not None:
+
+        _add_wave(
+            actions,
             world,
-            plant
+            plants_by_name,
+            LEVEL_THREE_AFTER_DROUGHT,
+            tick=drought_tick + 1,
+            used_positions=used_positions,
         )
 
-        # Remove positions already used
-        available_cells = []
+    # Animal/unlock-driven species
+    _add_wave(
+        actions,
+        world,
+        plants_by_name,
+        LEVEL_THREE_SECOND_WAVE,
+        tick=25,
+        used_positions=used_positions,
+    )
 
-        for cell in valid_cells:
+    _add_wave(
+        actions,
+        world,
+        plants_by_name,
+        LEVEL_THREE_THIRD_WAVE,
+        tick=60,
+        used_positions=used_positions,
+    )
 
-            position = (
-                cell.row,
-                cell.col
-            )
+    _add_wave(
+        actions,
+        world,
+        plants_by_name,
+        LEVEL_THREE_ADVANCED_WAVE,
+        tick=100,
+        used_positions=used_positions,
+    )
 
-            if position not in used_positions:
-                available_cells.append(cell)
+    # Rain occurs at tick 150.
+    rain_tick = _event_tick(
+        world,
+        "Rain"
+    )
 
-        if not available_cells:
-            continue
+    if rain_tick is not None:
 
-        # Spread our plants through the available area
-        fraction = (
-            plant_number + 1
-        ) / (
-            number_of_plants + 1
+        _add_wave(
+            actions,
+            world,
+            plants_by_name,
+            LEVEL_THREE_AFTER_RAIN,
+            tick=rain_tick + 1,
+            used_positions=used_positions,
         )
 
-        cell_index = int(
-            fraction
-            * (len(available_cells) - 1)
+    return _sort_actions(
+        actions
+    )
+
+
+def build_strategy(
+    level_number,
+    world,
+    plants,
+    unlock_conditions
+):
+
+    if level_number == 1:
+
+        return build_level_one_strategy(
+            world,
+            plants,
+            unlock_conditions
         )
 
-        chosen_cell = available_cells[cell_index]
+    if level_number == 2:
 
-        used_positions.add(
-            (
-                chosen_cell.row,
-                chosen_cell.col
-            )
+        return build_level_two_strategy(
+            world,
+            plants,
+            unlock_conditions
         )
 
-        action = PlantingAction(
-            tick=0,
-            plant_index=plant.index,
+    if level_number == 3:
 
-            # Column acts as X
-            x=chosen_cell.col,
-
-            # Row acts as Y
-            y=chosen_cell.row
+        return build_level_three_strategy(
+            world,
+            plants,
+            unlock_conditions
         )
 
-        actions.append(action)
-
-    return actions
+    raise ValueError(
+        f"Unsupported level: "
+        f"{level_number}"
+    )

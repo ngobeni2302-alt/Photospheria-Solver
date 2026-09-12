@@ -7,4 +7,7 @@ class Animal:
     id: str
     name: str
     requirements: dict[str, Any]
-    effects: list[dict[str, Any]] = field(default_factory=list)
+
+    effects: list[dict[str, Any]] = field(
+        default_factory=list
+    )

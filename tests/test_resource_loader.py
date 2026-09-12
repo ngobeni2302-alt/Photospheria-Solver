@@ -1,9 +1,9 @@
 from src.loaders.resource_loader import (
-    load_plants,
     load_animals,
     load_classifications,
+    load_level,
+    load_plants,
     load_unlock_conditions,
-    load_level
 )
 
 
@@ -30,38 +30,64 @@ def test_load_classifications():
 
 
 def test_load_unlock_conditions():
-    unlock_conditions = load_unlock_conditions()
+    unlocks = load_unlock_conditions()
 
-    assert len(unlock_conditions) == 26
-    assert unlock_conditions[0]["plant"] == "Blue Moss"
+    assert len(unlocks) == 26
+    assert unlocks[0]["plant"] == "Blue Moss"
 
 
-def test_load_level():
-    world = load_level()
+def test_load_level_two():
+    world = load_level(
+        "2.json"
+    )
 
-    assert world.rows == 50
-    assert world.cols == 50
+    assert world.rows == 70
+    assert world.cols == 100
     assert world.ticks == 500
-    assert world.animals_enabled is False
+    assert world.animals_enabled is True
 
 
-def test_level_contains_cells():
-    world = load_level()
+def test_level_two_rain_event():
+    world = load_level(
+        "2.json"
+    )
 
-    cell = world.get_cell(0, 10)
+    assert (
+        "Rain"
+        in world.get_events_up_to_tick(
+            250
+        )
+    )
 
-    assert cell is not None
-    assert cell.row == 0
-    assert cell.col == 10
-    assert cell.terrain == 2
-    assert cell.soil == 0
+    assert (
+        "Rain"
+        not in world.get_events_up_to_tick(
+            249
+        )
+    )
 
 
-def test_level_seasons():
-    world = load_level()
+def test_level_two_seasons():
+    world = load_level(
+        "2.json"
+    )
 
-    assert world.get_season_for_tick(99) is None
-    assert world.get_season_for_tick(100) == "Summer"
-    assert world.get_season_for_tick(200) == "Autumn"
-    assert world.get_season_for_tick(300) == "Winter"
-    assert world.get_season_for_tick(400) == "Spring"
+    assert (
+        world.get_season_for_tick(100)
+        == "Summer"
+    )
+
+    assert (
+        world.get_season_for_tick(200)
+        == "Autumn"
+    )
+
+    assert (
+        world.get_season_for_tick(300)
+        == "Winter"
+    )
+
+    assert (
+        world.get_season_for_tick(400)
+        == "Spring"
+    )

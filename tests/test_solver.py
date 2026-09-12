@@ -3,78 +3,86 @@ import json
 from src.loaders.resource_loader import (
     load_level,
     load_plants,
-    load_unlock_conditions
+    load_unlock_conditions,
 )
-
-from src.solver.strategy import (
-    build_level_one_strategy
-)
-
-from src.output.solution_writer import (
-    write_solution
-)
+from src.output.solution_writer import write_solution
+from src.solver.strategy import build_level_two_strategy
 
 
-def test_level_one_strategy():
-    world = load_level("1.json")
+def test_level_two_strategy_is_deterministic():
+    world = load_level("2.json")
     plants = load_plants()
-    unlock_conditions = load_unlock_conditions()
+    unlocks = load_unlock_conditions()
 
-    actions = build_level_one_strategy(
+    first = build_level_two_strategy(
         world,
         plants,
-        unlock_conditions
+        unlocks,
     )
 
-    # There are five plants without unlock conditions
-    assert len(actions) == 5
+    second = build_level_two_strategy(
+        world,
+        plants,
+        unlocks,
+    )
 
-    # Baseline plants are planted at the beginning
-    for action in actions:
-        assert action.tick == 0
+    assert first == second
 
-    # No two plants should start on the same cell
-    positions = {
+
+def test_level_two_strategy_has_no_duplicate_positions():
+    actions = build_level_two_strategy(
+        load_level("2.json"),
+        load_plants(),
+        load_unlock_conditions(),
+    )
+
+    positions = [
         (action.x, action.y)
         for action in actions
-    }
+    ]
 
-    assert len(positions) == len(actions)
+    assert len(positions) == len(set(positions))
 
 
-def test_solution_writer(tmp_path):
-    world = load_level("1.json")
-    plants = load_plants()
-    unlock_conditions = load_unlock_conditions()
-
-    actions = build_level_one_strategy(
-        world,
-        plants,
-        unlock_conditions
+def test_solution_writer_creates_json_object(tmp_path):
+    actions = build_level_two_strategy(
+        load_level("2.json"),
+        load_plants(),
+        load_unlock_conditions(),
     )
 
-    output_file = (
-        tmp_path / "solution.json"
-    )
+    output = tmp_path / "solution.json"
 
     write_solution(
         actions,
-        output_file
+        output
     )
 
-    assert output_file.exists()
+    data = json.loads(
+        output.read_text(
+            encoding="utf-8"
+        )
+    )
 
-    with open(
-        output_file,
-        "r",
-        encoding="utf-8"
-    ) as file:
+    assert isinstance(data, dict)
 
-        solution = json.load(file)
+    assert "actions" in data
 
-    assert len(solution) == 5
+    assert isinstance(
+        data["actions"],
+        list
+    )
 
-    assert "tick" in solution[0]
-    assert "plant" in solution[0]
-    assert "x" in solution[0]
-    assert "y" in solution[0]
+    assert len(
+        data["actions"]
+    ) == len(actions)
+
+    if data["actions"]:
+        assert {
+            "tick",
+            "plant",
+            "x",
+            "y",
+        }.issubset(
+            data["actions"][0]
+        )

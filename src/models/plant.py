@@ -11,13 +11,21 @@ class Growth:
     spread_range: int
     root_type: str
     invasiveness_rank: int
-    conditional_modifiers: list[dict[str, Any]] = field(default_factory=list)
+
+    conditional_modifiers: list[dict[str, Any]] = field(
+        default_factory=list
+    )
 
 
 @dataclass
 class PlantRules:
-    weaknesses: list[dict[str, Any]] = field(default_factory=list)
-    special: list[dict[str, Any]] = field(default_factory=list)
+    weaknesses: list[dict[str, Any]] = field(
+        default_factory=list
+    )
+
+    special: list[dict[str, Any]] = field(
+        default_factory=list
+    )
 
 
 @dataclass

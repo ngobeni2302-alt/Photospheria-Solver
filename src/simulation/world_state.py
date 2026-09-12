@@ -1,29 +1,86 @@
 from dataclasses import dataclass, field
 
-from src.level_config import (
-    WORLD_WIDTH,
-    WORLD_HEIGHT,
-    MAX_TICKS,
-    SEASONS_ENABLED,
-    ANIMALS_ENABLED,
-    WEATHER_ENABLED
-)
-
 
 @dataclass
 class WorldState:
-    width: int = WORLD_WIDTH
-    height: int = WORLD_HEIGHT
-
     current_tick: int = 0
-    max_ticks: int = MAX_TICKS
 
-    seasons_enabled: bool = SEASONS_ENABLED
-    animals_enabled: bool = ANIMALS_ENABLED
-    weather_enabled: bool = WEATHER_ENABLED
+    plant_counts: dict[
+        str,
+        int
+    ] = field(
+        default_factory=dict
+    )
 
-    plant_counts: dict = field(default_factory=dict)
-    coverage: dict = field(default_factory=dict)
-    species: set = field(default_factory=set)
-    events: set = field(default_factory=set)
-    features: dict = field(default_factory=dict)
+    coverage: dict[
+        str,
+        float
+    ] = field(
+        default_factory=dict
+    )
+
+    species: set[str] = field(
+        default_factory=set
+    )
+
+    events: set[str] = field(
+        default_factory=set
+    )
+
+    features: dict[
+        str,
+        float
+    ] = field(
+        default_factory=dict
+    )
+
+    plant_positions: dict[
+        tuple[int, int],
+        str
+    ] = field(
+        default_factory=dict
+    )
+
+    active_animal_names: set[str] = field(
+        default_factory=set
+    )
+
+    def recalculate(
+        self,
+        plantable_cell_count: int
+    ) -> None:
+
+        counts = {}
+
+        for plant_name in (
+            self.plant_positions.values()
+        ):
+
+            counts[plant_name] = (
+                counts.get(
+                    plant_name,
+                    0
+                )
+                + 1
+            )
+
+        self.plant_counts = counts
+
+        denominator = max(
+            plantable_cell_count,
+            1
+        )
+
+        self.coverage = {
+            name: count / denominator
+            for name, count
+            in self.plant_counts.items()
+        }
+
+        self.species = (
+            set(self.plant_counts)
+            |
+            set(
+                self.active_animal_names
+            )
+        )

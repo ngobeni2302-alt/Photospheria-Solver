@@ -1,95 +1,194 @@
-def compare(actual_value, operator, required_value):
-    if operator == ">":
-        return actual_value > required_value
+def compare(
+    actual_value,
+    operator,
+    required_value
+) -> bool:
 
-    if operator == ">=":
-        return actual_value >= required_value
+    operations = {
+        ">": actual_value > required_value,
+        ">=": actual_value >= required_value,
+        "<": actual_value < required_value,
+        "<=": actual_value <= required_value,
+        "==": actual_value == required_value,
+        "!=": actual_value != required_value,
+    }
 
-    return False
+    return operations.get(
+        operator,
+        False
+    )
 
 
-def evaluate_condition(condition, world_state):
-    # Handle AND / OR groups
+def _get_value(
+    world_state,
+    name,
+    default
+):
+
+    if isinstance(
+        world_state,
+        dict
+    ):
+        return world_state.get(
+            name,
+            default
+        )
+
+    return getattr(
+        world_state,
+        name,
+        default
+    )
+
+
+def evaluate_condition(
+    condition: dict,
+    world_state
+) -> bool:
+
     if "op" in condition:
+
         operation = condition["op"]
-        children = condition["children"]
+
+        children = condition.get(
+            "children",
+            []
+        )
 
         if operation == "AND":
+
             return all(
-                evaluate_condition(child, world_state)
+                evaluate_condition(
+                    child,
+                    world_state
+                )
                 for child in children
             )
 
         if operation == "OR":
+
             return any(
-                evaluate_condition(child, world_state)
+                evaluate_condition(
+                    child,
+                    world_state
+                )
                 for child in children
             )
 
-    condition_type = condition["type"]
+        return False
+
+    condition_type = condition.get(
+        "type"
+    )
+
+    species = _get_value(
+        world_state,
+        "species",
+        set()
+    )
+
+    coverage = _get_value(
+        world_state,
+        "coverage",
+        {}
+    )
+
+    plant_counts = _get_value(
+        world_state,
+        "plant_counts",
+        {}
+    )
+
+    events = _get_value(
+        world_state,
+        "events",
+        set()
+    )
+
+    features = _get_value(
+        world_state,
+        "features",
+        {}
+    )
 
     if condition_type == "species_present":
-        species = condition["species"]
-        return species in world_state["species"]
+
+        return (
+            condition.get("species")
+            in species
+        )
 
     if condition_type == "species_absent":
-        species = condition["species"]
-        return species not in world_state["species"]
+
+        return (
+            condition.get("species")
+            not in species
+        )
 
     if condition_type == "coverage":
-        plant = condition["plant"]
-        operator = condition["operator"]
-        required_value = condition["value"]
 
-        actual_value = world_state["coverage"].get(plant, 0)
+        actual = coverage.get(
+            condition.get("plant"),
+            0.0
+        )
 
         return compare(
-            actual_value,
-            operator,
-            required_value
+            actual,
+            condition.get("operator"),
+            condition.get("value")
         )
 
     if condition_type == "count":
-        plant = condition["plant"]
-        operator = condition["operator"]
-        required_value = condition["value"]
 
-        actual_value = world_state["plant_counts"].get(plant, 0)
+        actual = plant_counts.get(
+            condition.get("plant"),
+            0
+        )
 
         return compare(
-            actual_value,
-            operator,
-            required_value
+            actual,
+            condition.get("operator"),
+            condition.get("value")
         )
 
     if condition_type == "event":
-        event = condition["event"]
-        return event in world_state["events"]
+
+        return (
+            condition.get("event")
+            in events
+        )
 
     if condition_type == "feature_count":
-        feature = condition["feature"]
-        operator = condition["operator"]
-        required_value = condition["value"]
 
-        actual_value = world_state["features"].get(feature, 0)
+        actual = features.get(
+            condition.get("feature"),
+            0
+        )
 
         return compare(
-            actual_value,
-            operator,
-            required_value
+            actual,
+            condition.get("operator"),
+            condition.get("value")
         )
 
     return False
 
 
-def is_plant_unlocked(plant_name, unlock_conditions, world_state):
-    for plant_rule in unlock_conditions:
+def is_plant_unlocked(
+    plant_name: str,
+    unlock_conditions: list[dict],
+    world_state
+) -> bool:
 
-        if plant_rule["plant"] == plant_name:
+    for rule in unlock_conditions:
+
+        if rule.get(
+            "plant"
+        ) == plant_name:
+
             return evaluate_condition(
-                plant_rule["unlock"],
+                rule["unlock"],
                 world_state
             )
 
-    # Plants with no unlock rule are available from the start
     return True

@@ -1,113 +1,134 @@
 import json
 from pathlib import Path
 
-from src.models.plant import Plant, Growth, PlantRules
 from src.models.animal import Animal
 from src.models.cell import Cell
+from src.models.plant import (
+    Growth,
+    Plant,
+    PlantRules
+)
 from src.models.world import World
 
 
-# Root folder of the project
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-# data/ folder
 DATA_FOLDER = PROJECT_ROOT / "data"
 
 
-def load_json(filename):
-    """
-    Opens a JSON file from the data folder
-    and returns the Python data.
-    """
-
+def load_json(filename: str):
     file_path = DATA_FOLDER / filename
 
-    with open(file_path, "r", encoding="utf-8") as file:
+    with open(
+        file_path,
+        "r",
+        encoding="utf-8"
+    ) as file:
+
         return json.load(file)
 
 
-def load_plants():
-    """
-    Loads all Photospheria plants
-    from plant_dataset.json.
-    """
-
-    plant_data = load_json("plant_dataset.json")
-
+def load_plants() -> list[Plant]:
     plants = []
 
-    for item in plant_data:
+    for item in load_json(
+        "plant_dataset.json"
+    ):
+
+        growth_data = dict(
+            item["growth"]
+        )
+
+        growth_data.setdefault(
+            "conditional_modifiers",
+            []
+        )
 
         growth = Growth(
-            **item["growth"]
+            **growth_data
         )
 
         rules = PlantRules(
-            weaknesses=item["rules"]["weaknesses"],
-            special=item["rules"]["special"]
+            weaknesses=(
+                item
+                .get("rules", {})
+                .get("weaknesses", [])
+            ),
+            special=(
+                item
+                .get("rules", {})
+                .get("special", [])
+            ),
         )
 
         plant = Plant(
             name=item["plant"],
             index=item["index"],
             growth=growth,
-            preferred_soil=item["preferred_soil"],
+            preferred_soil=item.get(
+                "preferred_soil",
+                []
+            ),
             rules=rules,
-            role=item["role"]
+            role=item.get(
+                "role",
+                ""
+            ),
         )
 
-        plants.append(plant)
+        plants.append(
+            plant
+        )
 
     return plants
 
 
-def load_animals():
-    """
-    Loads all animals from animals.json.
-    """
-
-    animal_data = load_json("animals.json")
+def load_animals() -> list[Animal]:
 
     animals = []
 
-    for item in animal_data:
+    for item in load_json(
+        "animals.json"
+    ):
 
         animal = Animal(
             id=item["id"],
             name=item["name"],
-            requirements=item["requirements"],
-            effects=item["effects"]
+            requirements=item[
+                "requirements"
+            ],
+            effects=item.get(
+                "effects",
+                []
+            ),
         )
 
-        animals.append(animal)
+        animals.append(
+            animal
+        )
 
     return animals
 
 
-def load_classifications():
-    """
-    Loads the plant classifications.
-    """
-
-    return load_json("classifications.json")
+def load_classifications() -> dict[str, list[str]]:
+    return load_json(
+        "classifications.json"
+    )
 
 
-def load_unlock_conditions():
-    """
-    Loads all plant unlock conditions.
-    """
-
-    return load_json("plant_unlock_conditions.json")
+def load_unlock_conditions() -> list[dict]:
+    return load_json(
+        "plant_unlock_conditions.json"
+    )
 
 
-def load_level(filename="1.json"):
-    """
-    Loads a Photospheria level file.
+def load_level(
+    filename: str = "2.json"
+) -> World:
 
-    For now the default is Level 1.
-    """
-
-    level_data = load_json(filename)
+    level_data = load_json(
+        filename
+    )
 
     cells = {}
 
@@ -117,19 +138,28 @@ def load_level(filename="1.json"):
             row=item["row"],
             col=item["col"],
             terrain=item["terrain"],
-            soil=item["soil"]
+            soil=item["soil"],
         )
 
-        # Store each cell using its coordinates
-        cells[(cell.row, cell.col)] = cell
+        cells[
+            (cell.row, cell.col)
+        ] = cell
 
-    world = World(
+    return World(
         rows=level_data["rows"],
         cols=level_data["cols"],
         ticks=level_data["ticks"],
-        animals_enabled=level_data["animals_enabled"],
-        cells=cells,
-        commands=level_data.get("commands", [])
-    )
 
-    return world
+        animals_enabled=(
+            level_data[
+                "animals_enabled"
+            ]
+        ),
+
+        cells=cells,
+
+        commands=level_data.get(
+            "commands",
+            []
+        ),
+    )

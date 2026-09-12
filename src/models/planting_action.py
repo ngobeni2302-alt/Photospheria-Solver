@@ -8,10 +8,10 @@ class PlantingAction:
     x: int
     y: int
 
-    def to_dict(self):
+    def to_dict(self) -> dict:
         return {
             "tick": self.tick,
             "plant": self.plant_index,
             "x": self.x,
-            "y": self.y
+            "y": self.y,
         }
