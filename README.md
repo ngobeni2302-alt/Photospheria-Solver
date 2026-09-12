@@ -4,76 +4,146 @@
 
 Photospheria Solver is a Python optimisation project built for the Entelect Hackathon.
 
-The challenge takes place on the fictional planet **Photospheria**, where different plant species interact with each other and with the environment.
+The challenge takes place on the fictional planet **Photospheria**, where plant species interact with each other and with their environment.
 
-The goal of the solver is to create a planting strategy that produces a diverse and sustainable ecosystem.
+The purpose of the solver is to analyse the supplied world, select suitable plants and planting locations, and generate a deterministic planting strategy.
 
-This repository is currently focused on **Level 1: Greenhouse Study**.
+This repository is currently focused on:
+
+# Level 1 — Greenhouse Study
+
+The overall challenge goal is to create a diverse biological sample and keep as many species alive for as long as possible.
 
 ---
 
-## Level 1
+## Level 1 Environment
 
-Level 1 takes place inside a greenhouse.
-
-The supplied Level 1 world contains:
-
-- World size: **50 x 50**
-- Simulation length: **500 ticks**
-- Animals: **Disabled**
-- Seasons: **Enabled**
-
-The season changes are:
-
-| Tick | Season |
-|------|--------|
-| 0 - 99 | Initial season |
-| 100 | Summer |
-| 200 | Autumn |
-| 300 | Winter |
-| 400 | Spring |
-
-The level information is stored in:
+The supplied Level 1 input is stored in:
 
 ```text
 data/1.json
 ```
 
-The level file also contains the terrain and soil information for the available cells.
+Level 1 contains:
+
+```text
+World size:       50 x 50
+Ticks:            500
+Animals enabled:  False
+Seasons:          Enabled
+```
+
+The Level 1 file also contains the available cells and their:
+
+```text
+row
+column
+terrain
+soil
+```
+
+The solver reads these values directly instead of manually creating a world.
 
 ---
 
-## Goal
+## Level 1 Seasons
 
-The goal of the solver is to decide:
+The Level 1 input contains season commands.
 
-- Which plant should be planted
-- Where the plant should be planted
-- When the plant should be planted
+The supplied season changes are:
 
-A planting action is based on:
+| Tick | Season |
+|------|--------|
+| 100 | Summer |
+| 200 | Autumn |
+| 300 | Winter |
+| 400 | Spring |
+
+The solver reads these commands directly from `1.json`.
+
+This means the season schedule is not hard-coded into the main solver.
+
+---
+
+## Goal of the Solver
+
+The solver must decide:
+
+```text
+Which plant should be planted?
+Where should it be planted?
+When should it be planted?
+```
+
+A planting action contains:
 
 ```text
 tick
-plant
+plant index
 x coordinate
 y coordinate
 ```
 
-The strategy should try to:
+The project will gradually improve its strategy to consider:
 
-- Increase plant diversity
-- Keep plants alive for as long as possible
-- Use suitable soil for each plant
-- Respect terrain restrictions
-- Make use of plant spreading
-- Consider seasonal changes
-- Respect plant unlock conditions
-- Produce deterministic results
+- Plant diversity
+- Suitable soil
+- Terrain restrictions
+- Plant maturity
+- Plant spreading
+- Plant weaknesses
+- Plant special rules
+- Unlock conditions
+- Seasons
+- Long-term survival
+- Final ecosystem diversity
 
 ---
 
-## Project Structure
+# Project Flow
+
+The project currently follows this flow:
+
+```text
+                    INPUT
+                      │
+                      ▼
+                 data/1.json
+                      │
+                      ▼
+              Resource Loader
+                      │
+          ┌───────────┴───────────┐
+          ▼                       ▼
+      World Data               Plant Data
+          │                       │
+          └───────────┬───────────┘
+                      ▼
+                 Strategy
+                      │
+                      ▼
+              Planting Actions
+                      │
+                      ▼
+              Solution Writer
+                      │
+                      ▼
+               solution.json
+```
+
+Running:
+
+```bash
+python main.py
+```
+
+will eventually perform the complete Level 1 pipeline.
+
+The current implementation already loads Level 1 and can generate a baseline set of planting actions.
+
+---
+
+# Project Structure
 
 ```text
 Photospheria-Solver/
@@ -91,6 +161,7 @@ Photospheria-Solver/
 │   └── classifications.json
 │
 ├── src/
+│   │
 │   ├── __init__.py
 │   ├── level_config.py
 │   │
@@ -139,131 +210,72 @@ Photospheria-Solver/
 
 ---
 
-## How the Solver Works
+# Input Files
 
-The project is designed around the following flow:
+## `1.json`
+
+This is the Level 1 world supplied by the hackathon.
+
+It contains:
 
 ```text
-Level 1 JSON
-     ↓
-Resource Loader
-     ↓
-World + Plant Data
-     ↓
-Plant Rules
-     ↓
-Simulation
-     ↓
-Strategy / Optimiser
-     ↓
-Planting Actions
-     ↓
-solution.json
+animals_enabled
+rows
+cols
+ticks
+cells
+commands
 ```
 
-### 1. Load the resources
+Example cell:
 
-`resource_loader.py` reads the supplied JSON files.
+```json
+{
+  "row": 0,
+  "col": 21,
+  "terrain": 0,
+  "soil": 1
+}
+```
 
-These include:
-
-- Level information
-- Plant information
-- Plant unlock conditions
-- Plant classifications
-- Animal information
-
-Although animals are included in the common resources, animals are disabled in Level 1.
+The solver uses the supplied cell information instead of assuming every coordinate is plantable.
 
 ---
 
-## Plant Model
+## `plant_dataset.json`
 
-Each plant is converted from JSON into a Python object.
+Contains the Photospherian plant catalogue.
 
-Plant information includes properties such as:
+Each plant contains information such as:
 
-- Plant name
-- Plant index
-- Time to maturity
-- Spread rate
-- Spread type
-- Spread range
-- Root type
-- Invasiveness
-- Preferred soil
-- Weaknesses
-- Special rules
+```text
+plant name
+plant index
+growth properties
+preferred soil
+rules
+role
+```
 
-This allows the solver to work with plant information using Python objects instead of raw JSON dictionaries.
+Growth information includes properties such as:
+
+```text
+time to maturity
+spread rate
+spread mechanism
+spread type
+spread range
+root type
+invasiveness rank
+```
 
 ---
 
-## World Model
+## `plant_unlock_conditions.json`
 
-The Level 1 world is loaded from:
+Contains the conditions required to unlock certain plant species.
 
-```text
-data/1.json
-```
-
-Each supplied cell contains:
-
-```text
-row
-column
-terrain
-soil
-```
-
-The solver stores these cells using their coordinates.
-
-Example:
-
-```python
-world.get_cell(0, 10)
-```
-
-The world model also stores:
-
-- Number of rows
-- Number of columns
-- Number of ticks
-- Whether animals are enabled
-- Season commands
-
----
-
-## Seasons
-
-Level 1 includes season changes.
-
-The solver reads these directly from `1.json` instead of hard-coding them into the simulation.
-
-The Level 1 season events are:
-
-```text
-Tick 100 -> Summer
-Tick 200 -> Autumn
-Tick 300 -> Winter
-Tick 400 -> Spring
-```
-
-Season effects will later be applied during simulation when the appropriate plant rules are implemented.
-
----
-
-## Unlock Conditions
-
-Some plants are not immediately available.
-
-The unlock engine reads:
-
-```text
-data/plant_unlock_conditions.json
-```
-
-The current rule engine supports condition types including:
+The current unlock engine supports conditions such as:
 
 ```text
 AND
@@ -276,193 +288,447 @@ event
 feature_count
 ```
 
-Plants without an unlock rule are treated as available from the beginning.
+If a plant does not have an unlock condition, the current strategy treats it as available at the beginning.
 
 ---
 
-## Level 1 Strategy
+## `animals.json`
 
-The Level 1 strategy will be developed in stages.
+Contains animal information.
 
-The solver will:
-
-1. Find valid plantable cells.
-2. Match plants with suitable soil.
-3. Place starting plants.
-4. Allow plants to mature.
-5. Simulate plant spreading.
-6. Track season changes.
-7. Evaluate plant interactions.
-8. Increase ecosystem diversity.
-9. Preserve useful species until the final tick.
-10. Generate the final planting plan.
-
-The strategy can later be improved using an optimisation algorithm.
-
----
-
-## Deterministic Output
-
-The hackathon requires the solution to be deterministic.
-
-This means:
+Although the common resource data contains animals, Level 1 has:
 
 ```text
-Same input
-    ↓
-Same program
-    ↓
-Same decisions
-    ↓
-Same solution.json
+animals_enabled = false
 ```
 
-Random behaviour should therefore either be avoided or use a fixed seed.
+Animal simulation is therefore not currently used for Level 1.
 
-The final source code must reproduce the submitted `solution.json`.
+The files remain in the project because later levels may enable animals.
 
 ---
 
-## solution.json
+## `classifications.json`
 
-`solution.json` represents the planting decisions produced by the solver.
+Contains plant classification information used by the Photospheria ecosystem.
 
-The source code is responsible for generating this file.
+This data is loaded and kept available for later strategy and scoring logic.
 
-Conceptually, each decision contains:
+---
+
+# Models
+
+## Plant
+
+`src/models/plant.py`
+
+Represents one Photospherian plant.
+
+The plant model stores the data loaded from the plant catalogue.
+
+---
+
+## Animal
+
+`src/models/animal.py`
+
+Represents an animal and its:
+
+```text
+id
+name
+requirements
+effects
+```
+
+Animals are not currently active in Level 1.
+
+---
+
+## Cell
+
+`src/models/cell.py`
+
+Represents one supplied world cell.
+
+A cell stores:
+
+```text
+row
+column
+terrain
+soil
+```
+
+The cell model also determines whether the terrain may be considered plantable.
+
+---
+
+## World
+
+`src/models/world.py`
+
+Represents the loaded Photospheria level.
+
+It stores:
+
+```text
+rows
+columns
+ticks
+animals_enabled
+cells
+commands
+```
+
+It also provides helper methods such as:
+
+```python
+world.get_cell(row, col)
+
+world.has_cell(row, col)
+
+world.get_plantable_cells()
+
+world.get_season_for_tick(tick)
+```
+
+---
+
+## PlantingAction
+
+`src/models/planting_action.py`
+
+Represents one decision made by the solver.
+
+A planting action currently stores:
+
+```python
+tick
+plant_index
+x
+y
+```
+
+The action can be converted into JSON-ready data using:
+
+```python
+action.to_dict()
+```
+
+---
+
+# Resource Loader
+
+`src/loaders/resource_loader.py`
+
+The resource loader is responsible for reading the supplied JSON files and converting them into Python objects.
+
+It currently supports:
+
+```python
+load_plants()
+
+load_animals()
+
+load_classifications()
+
+load_unlock_conditions()
+
+load_level()
+```
+
+For Level 1:
+
+```python
+world = load_level("1.json")
+```
+
+creates the Level 1 `World` object.
+
+---
+
+# Unlock Rules
+
+`src/rules/unlock_rules.py`
+
+The unlock engine determines whether a plant is currently available.
+
+The engine supports nested:
+
+```text
+AND
+OR
+```
+
+conditions and several individual condition types.
+
+Plants without an unlock definition are currently treated as starting plants.
+
+---
+
+# Current Level 1 Strategy
+
+`src/solver/strategy.py`
+
+The current Level 1 strategy is a **baseline deterministic strategy**.
+
+It currently:
+
+1. Loads all plants.
+2. Reads the plant unlock conditions.
+3. Finds plants without unlock requirements.
+4. Finds suitable Level 1 cells.
+5. Checks each plant's preferred soil.
+6. Avoids reusing the same starting coordinate.
+7. Spreads starting positions across available cells.
+8. Creates planting actions at tick `0`.
+9. Returns the actions to the output writer.
+
+This is not the final optimisation strategy.
+
+Its purpose is to establish a complete working pipeline:
+
+```text
+Level input
+    ↓
+strategy
+    ↓
+actions
+    ↓
+solution.json
+```
+
+The strategy will later be improved using actual plant growth and ecosystem simulation.
+
+---
+
+# solution.json
+
+`solution.json` is the output produced by the solver.
+
+It is **not an explanation of how the challenge was solved**.
+
+The source code represents how the problem was solved.
+
+`solution.json` represents the actual planting decisions made by the program.
+
+Conceptually:
+
+```text
+code.zip
+    =
+HOW the problem was solved
+
+solution.json
+    =
+WHAT planting decisions the solver produced
+```
+
+Each planting action contains:
 
 ```text
 tick
 plant index
-x coordinate
-y coordinate
+x
+y
 ```
 
-The exact submission structure should follow the official Photospheria output specification.
+The current writer produces a JSON representation of the generated actions.
+
+The final JSON structure must match the official Photospheria submission specification.
 
 ---
 
-## Running the Project
+# Solution Writer
 
-Create a virtual environment:
+`src/output/solution_writer.py`
 
-```bash
-python3 -m venv .venv
-```
-
-Activate it:
-
-```bash
-source .venv/bin/activate
-```
-
-Install the dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-Run the tests:
-
-```bash
-python -m pytest -v
-```
-
-Run the solver:
-
-```bash
-python main.py
-```
-
-Once the solver is complete, running `main.py` will generate:
+The solution writer takes the planting actions produced by the strategy and writes them to:
 
 ```text
 solution.json
 ```
 
+Before writing, actions are sorted using:
+
+```text
+tick
+plant index
+x
+y
+```
+
+This helps ensure deterministic output.
+
 ---
 
-## Testing
+# Running the Solver
+
+First activate the virtual environment:
+
+```bash
+source .venv/bin/activate
+```
+
+Then run:
+
+```bash
+python main.py
+```
+
+The current process is:
+
+```text
+Loading Photospheria Level 1
+            ↓
+Loading plants
+            ↓
+Loading unlock rules
+            ↓
+Finding starting plants
+            ↓
+Finding suitable cells
+            ↓
+Creating planting actions
+            ↓
+Writing solution.json
+```
+
+The terminal should display information about the Level 1 world and the actions selected by the current strategy.
+
+---
+
+# Deterministic Output
+
+The challenge requires deterministic behaviour.
+
+That means:
+
+```text
+Same input
+      ↓
+Same source code
+      ↓
+Same strategy
+      ↓
+Same planting actions
+      ↓
+Same solution.json
+```
+
+The solver therefore sorts cells, plants and output actions instead of relying on unpredictable ordering.
+
+Random behaviour is currently avoided.
+
+---
+
+# Running the Tests
 
 The project uses `pytest`.
 
-Current tests check that:
+Activate the environment:
 
-- Plants can be loaded
-- Animals can be loaded
-- Plant classifications can be loaded
-- Unlock conditions can be loaded
-- Level 1 can be loaded
-- The Level 1 dimensions are correct
-- Level 1 cell information can be accessed
-- Level 1 season changes are recognised
-- Basic plant unlock logic works
-
-Current test status:
-
-```text
-8 tests passed
+```bash
+source .venv/bin/activate
 ```
 
-Run all tests using:
+Run all tests:
 
 ```bash
 python -m pytest -v
 ```
 
----
-
-## Current Progress
+The project has already verified:
 
 ```text
-Project structure        
-Plant model              
-Animal model            
-Resource loader          
-Plant data loading      
-Level 1 loading          
-World model              
-Cell model              
-Season loading           
-Basic unlock rules       
-Automated tests          
+Plant loading
+Animal loading
+Classification loading
+Unlock-condition loading
+Level 1 loading
+Level dimensions
+Level cells
+Season commands
+Basic unlock behaviour
+```
 
-Plant placement rules    
-Growth simulation        
-Spread simulation        
-Season effects           
-Scoring                   
-Optimisation strategy    
-solution.json generator  
+Additional solver/output tests are being added as the Level 1 strategy develops.
+
+---
+
+# Next Development Steps
+
+The next major goal is to move from a simple baseline planting strategy to an actual ecosystem simulation.
+
+The planned flow is:
+
+```text
+Plant placement validation
+          ↓
+Plant maturity
+          ↓
+Plant spreading
+          ↓
+Season effects
+          ↓
+Plant interactions
+          ↓
+Unlock new species
+          ↓
+Score ecosystem
+          ↓
+Try alternative strategies
+          ↓
+Choose better strategy
+          ↓
+solution.json
+```
+
+The solver will continue to produce `solution.json`, but the quality of the generated planting plan will improve as more Photospheria mechanics are implemented.
+
+---
+
+# Technology
+
+The project currently uses:
+
+```text
+Python
+JSON
+pytest
+Python dataclasses
+```
+
+Python was selected because the Photospheria challenge involves:
+
+```text
+Data processing
+Simulation
+Rule evaluation
+Search
+Optimisation
+JSON generation
 ```
 
 ---
 
-## Future Levels
+# Level 1 Status
 
-The project structure is designed so that later Photospheria levels can reuse the same engine.
+The project can currently:
 
-Future levels may introduce additional mechanics such as:
+```text
+Read the actual Level 1 input          
+Understand the supplied world cells   
+Read plant information                
+Read unlock information               
+Read season changes                   
+Find starting plants                  
+Find suitable starting cells         
+Create planting actions               
+Generate solution.json               
+```
 
-- Animals
-- More terrain restrictions
-- Weather
-- More plant species
-- More environmental interactions
+The next objective is not simply to make the output file exist.
 
-Instead of creating a new solver for every level, the goal is to reuse the same simulation engine with different level input files.
-
----
-
-## Technology
-
-The project currently uses:
-
-- **Python**
-- **JSON**
-- **pytest**
-- **Python dataclasses**
-
-Python was selected because the challenge involves data processing, simulation, searching possible strategies and producing JSON output.
-
----
+The next objective is to make the generated **Level 1 strategy smarter and more competitive**.
